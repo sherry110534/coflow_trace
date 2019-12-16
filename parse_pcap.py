@@ -1,7 +1,6 @@
 from scapy.config import conf
 conf.ipv6_enabled = False
 from scapy.all import *
-from Protocol import Protocol
 import os
 import csv
 
@@ -9,10 +8,32 @@ dir = './result/fix/'
 output = './result/result.csv'
 file = os.listdir(dir)
 
+def string_to_hex(hex_string):
+    result = 0
+    for i in range(len(hex_string)):
+        result += int(hex_string[len(hex_string)-1-i], base=16) * 16**i
+    return result
+def parse_payload(payload):
+    hex_list = []
+    for b in payload:
+        h = hex(ord(b))[2:]
+        if len(h) == 1:
+            hex_list.append('0')
+        hex_list.append(h)
+    hex_string = ''.join(hex_list)
+    return hex_string
+
 with open(output, 'w') as csvfile:
     w = csv.writer(csvfile)
-    w.writerow([coflowId', 'ArrivalTime', 'FlowNum', 'src', 'dst'])
+    w.writerow(['CoflowId', 'ArrivalTime', 'FlowNum', 'src', 'dst'])
     for filename in file:
         packet = rdpcap(dir + filename)
         for i in range(len(packet[TCP])):
-            w.writerow([Protocol(str(packet[TCP][0])).coflowId, Protocol(str(packet[TCP][0])).ArrivalTime, Protocol(str(packet[TCP][0])).FlowNum, packet[TCP][0].src, packet[TCP][0].dst])
+            if packet[TCP][i].ack != 0:
+                continue
+            hex_string = parse_payload(packet[TCP][i].load)
+            CoflowId_hex = hex_string[0:8]
+            ArrivalTime_hex = hex_string[8:16]
+            FlowNum_hex = hex_string[16:24]
+            # write into csv
+            w.writerow([string_to_hex(CoflowId_hex), string_to_hex(ArrivalTime_hex), string_to_hex(FlowNum_hex), packet[TCP][0].src, packet[TCP][0].dst])

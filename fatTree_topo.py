@@ -7,14 +7,18 @@ from mininet.topo import Topo
 from mininet.util import dumpNodeConnections
 import logging
 import os
-import random
 import time
-
-COFLOW_NUM = 10
-MAX_FLOW_NUM = 5
+import json
 
 logging.basicConfig(filename='./fattree.log', level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+POD_NUM = 4
+DENSITY = 2
+HOST_NUM = POD_NUM * POD_NUM/2 * DENSITY
+
+FILE_NAME = "./coflow_data.json"
+OUTPUT_DIR = "./task/"
 
 class Fattree(Topo):
     logger.debug("Class Fattree")
@@ -50,21 +54,21 @@ class Fattree(Topo):
                 PREFIX = str(level) + "0"
             switch_list.append(self.addSwitch('s' + PREFIX + str(x), failMode = 'standalone'))
 
-    def createCoreLayerSwitch(self, NUMBER):
+    def createCoreLayerSwitch(self, number):
         logger.debug("Create Core Layer")
-        self._addSwitch(NUMBER, 1, self.CoreSwitchList)
+        self._addSwitch(number, 1, self.CoreSwitchList)
 
-    def createAggLayerSwitch(self, NUMBER):
+    def createAggLayerSwitch(self, number):
         logger.debug("Create Agg Layer")
-        self._addSwitch(NUMBER, 2, self.AggSwitchList)
+        self._addSwitch(number, 2, self.AggSwitchList)
 
-    def createEdgeLayerSwitch(self, NUMBER):
+    def createEdgeLayerSwitch(self, number):
         logger.debug("Create Edge Layer")
-        self._addSwitch(NUMBER, 3, self.EdgeSwitchList)
+        self._addSwitch(number, 3, self.EdgeSwitchList)
 
-    def createHost(self, NUMBER):
+    def createHost(self, number):
         logger.debug("Create Host")
-        for x in xrange(1, NUMBER+1):
+        for x in xrange(1, number+1):
             PREFIX = "h00"
             if x >= int(10):
                 PREFIX = "h0"
@@ -120,13 +124,25 @@ def pingTest(net):
     logger.debug("Start Test all network")
     return net.pingAll()
 
-def read_data():
-    data_line = []
-    with open('FB2010-1Hr-150-0.txt', 'r') as f:
-        for line in f:
-            data_line.append(line.replace('\n', '').split(' '))
-    data_line = data_line[1:]
-    return data_line
+
+def readData():
+    with open(FILE_NAME, "r") as f:
+        load_data = json.load(f)
+        return load_data
+
+def getSrcHostId(mapper_id):
+    return mapper_id % (HOST_NUM/2) + 1
+
+def getDstHostId(reducer_id):
+    return (reducer_id % (HOST_NUM/2)) + 1 + (HOST_NUM/2)
+
+def getHostName(hostid):
+    PREFIX = "h00"
+    if hostid >= int(10):
+        PREFIX = "h0"
+    elif hostid >= int(100):
+        PREFIX = "h"
+    return PREFIX + str(hostid)
 
 if __name__ == '__main__':
     setLogLevel('info')
@@ -134,85 +150,99 @@ if __name__ == '__main__':
         logger.debug("You are NOT root")
     elif os.getuid() == 0:
         logging.debug("LV1 Create Fattree")
-        topo = Fattree(4, 2) # pod = 4, density = 2
+        topo = Fattree(POD_NUM, DENSITY)
         topo.createTopo()
-        topo.createLink(bw_c2a=0.2, bw_a2e=0.1, bw_h2a=0.05)
+        topo.createLink(bw_c2a=20, bw_a2e=10, bw_h2a=5)
 
         logging.debug("LV1 Start Mininet")
         CONTROLLER_IP = "127.0.0.1"
         CONTROLLER_PORT = 6653
         net = Mininet(topo=topo, link=TCLink, controller=None, autoSetMacs=True, autoStaticArp=False)
-        net.addController('controller', controller=RemoteController,ip=CONTROLLER_IP, port=CONTROLLER_PORT)
+        net.addController("controller", controller=RemoteController,ip=CONTROLLER_IP, port=CONTROLLER_PORT)
         net.start()
 
-        topo.set_ovs_protocol_13() # Set OVS's protocol as OF13
+        # Set OVS's protocol as OF13
+        topo.set_ovs_protocol_13() 
         logger.debug("LV1 dumpNode")
-
-        dumpNodeConnections(net.hosts) # print all connection relationship
+        # print all connection relationship
+        dumpNodeConnections(net.hosts) 
         # check all host connect
         drop = 100
-        while(1):
-            if(drop == 0):
+        while 1 :
+            if drop == 0 :
                 break
             drop = pingTest(net)
-        # tcpdump
-        for i in range(len(Fattree.HostList)/2, len(Fattree.HostList)):
-            print 'start to record trace in ', Fattree.HostList[i]
+        # use tcpdump to record packet in background
+        for i in range(HOST_NUM/2, HOST_NUM):
+            print "start to record trace in ", Fattree.HostList[i]
             tmp = net.get(Fattree.HostList[i])
-            tmp_cmd = 'tcpdump -w ./result/origin/' + Fattree.HostList[i] + '.pcap &'
+            tmp_cmd = "tcpdump -w ./result/origin/" + Fattree.HostList[i] + ".pcap &"
             tmp.cmd(tmp_cmd)
 
-        # open wireshark
-        # for i in range(len(Fattree.HostList)/2, len(Fattree.HostList)):
-        #     print 'open wireshark in ', Fattree.HostList[i]
-        #     tmp = net.get(Fattree.HostList[i])
-        #     tmp.cmd('wireshark &')
+        # create host task
+        coflow_data = readData()
+        sleep_time = coflow_data[-1]["Arrival time"]
+        output_data = []
+        for i in range(HOST_NUM/2):
+            output_data.append([])
+        for i in range(len(coflow_data)):
+            flow_num = coflow_data[i]["Mapper num"] * coflow_data[i]["Reducer num"]
+            for j in range(coflow_data[i]["Mapper num"]):
+                hostid = getSrcHostId(coflow_data[i]["Mapper list"][j])
+                this_coflow_data = {}
+                this_coflow_data["Coflow ID"] = coflow_data[i]["Coflow ID"]
+                this_coflow_data["Arrival time"] = coflow_data[i]["Arrival time"]
+                this_coflow_data["Flow Number"] = flow_num
+                this_coflow_data["Dst list"] = []
+                this_coflow_data["Dst data"] = []
+                for k in range(coflow_data[i]["Reducer num"]):
+                    flow_size = coflow_data[i]["Reducer data"][k]*1024 / coflow_data[i]["Mapper num"] # data size per flow (transfer MB to KB)
+                    dst = net.get(getHostName(getDstHostId(coflow_data[i]["Dst list"][k])))
+                    dst_ip = dst.IP()
+                    this_coflow_data["Dst list"].append(dst_ip)
+                    this_coflow_data["Dst data"].append(flow_size)
+                output_data[hostid-1].append(this_coflow_data)
+        for i in range(len(output_data)):
+            hostname = getHostName(getSrcHostId(i+1)) 
+            with open(OUTPUT_DIR + hostname + "_task.json", "w") as f:
+                json.dump(output_data[i], f)
+        print "complete output task"
 
-        # get coflow data
-        trace = read_data()
-        # print 'wait for open wireshark'
-        # time.sleep(20)
-        sleep_time = 0
+        time.sleep(1) # wait for executing tcpdump
         # create coflow 
-        print 'start to create coflow'
-        for i in range(COFLOW_NUM):
-            flow_num = random.randint(1, MAX_FLOW_NUM) # determine the flow number in a coflow
-            dst = net.get(random.sample(Fattree.HostList[len(Fattree.HostList)/2: len(Fattree.HostList)], 1)[0])
-            dst_ip = dst.IP()
-            for j in range(flow_num): # random choose flow_num host to send data
-                src = net.get(random.sample(Fattree.HostList[0: len(Fattree.HostList)/2], 1)[0])
-                src_ip = src.IP()
-                print 'from ', src_ip, ' to ', dst_ip
-                print 'coflow id: ', i
-                # TCP_sender.py src_ip dst_ip coflow_id arrival_time flow_num
-                tmp_cmd = 'python TCP_sender.py ' + str(src_ip)  + ' ' + str(dst_ip) + ' ' + str(i)
-                tmp_cmd = tmp_cmd + ' ' + str(trace[i][1]) + ' ' + str(flow_num) + ' &'
-                result = src.cmd(tmp_cmd)
-                sleep_time = int(trace[i][1])
-                print result
-        
+        print "start to send flow"
+        for i in range(HOST_NUM/2):
+            src_host = getHostName(getSrcHostId(i))
+            src = net.get(src_host)
+            src_ip = src.IP()
+            # python TCP_sender.py hostname hostip &
+            tmp_cmd = "python TCP_sender.py " + str(src_host) + " " + str(src_ip) + " &"
+            result = src.cmd(tmp_cmd)
+            print tmp_cmd
+
         time.sleep(sleep_time/1000)
-        print 'the last coflow is start'
+        print "the last coflow starts"
 
         # check jobs still run
         flag = 1
-        while(flag):
-            for host in Fattree.HostList[0: len(Fattree.HostList)/2]:
+        count = 0
+        while flag :
+            time.sleep(20) # after 20 seconds, check again
+            for host in Fattree.HostList[0: HOST_NUM/2]:
                 tmp = net.get(host)
-                now_jobs = tmp.cmd('jobs')
-                if len(now_jobs) != 0 :
-                    print 'jobs in ', host, ' still run'
+                now_jobs = tmp.cmd("jobs")
+                if len(now_jobs) != 0 : # still send data
+                    print "jobs in ", host, " still run ", count
+                    count += 1
                     flag = 1
-                    time.sleep(10)
                     break
-                else:
+                else: # complete
                     flag = 0
                     continue
 
-
         # close tcpdump
-        for i in range(len(Fattree.HostList)/2, len(Fattree.HostList)):
-            print 'close to trace flow in ', Fattree.HostList[i]
+        for i in range(HOST_NUM/2, HOST_NUM):
+            print "close to trace flow in ", Fattree.HostList[i]
             tmp = net.get(Fattree.HostList[i])
             tmp_cmd = "ps aux | grep tcpdump | awk '{print $2}' | xargs sudo kill -9"
 
