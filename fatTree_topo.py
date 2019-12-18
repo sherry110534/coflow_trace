@@ -152,7 +152,7 @@ if __name__ == '__main__':
         logging.debug("LV1 Create Fattree")
         topo = Fattree(POD_NUM, DENSITY)
         topo.createTopo()
-        topo.createLink(bw_c2a=20, bw_a2e=10, bw_h2a=5)
+        topo.createLink(bw_c2a=500, bw_a2e=250, bw_h2a=125) # Mbps
 
         logging.debug("LV1 Start Mininet")
         CONTROLLER_IP = "127.0.0.1"
@@ -197,7 +197,7 @@ if __name__ == '__main__':
                 this_coflow_data["Dst data"] = []
                 for k in range(coflow_data[i]["Reducer num"]):
                     flow_size = coflow_data[i]["Reducer data"][k]*1024 / coflow_data[i]["Mapper num"] # data size per flow (transfer MB to KB)
-                    dst = net.get(getHostName(getDstHostId(coflow_data[i]["Dst list"][k])))
+                    dst = net.get(getHostName(getDstHostId(coflow_data[i]["Reducer list"][k])))
                     dst_ip = dst.IP()
                     this_coflow_data["Dst list"].append(dst_ip)
                     this_coflow_data["Dst data"].append(flow_size)
@@ -225,15 +225,18 @@ if __name__ == '__main__':
 
         # check jobs still run
         flag = 1
-        count = 0
+        check = 0
         while flag :
             time.sleep(20) # after 20 seconds, check again
             for host in Fattree.HostList[0: HOST_NUM/2]:
                 tmp = net.get(host)
                 now_jobs = tmp.cmd("jobs")
                 if len(now_jobs) != 0 : # still send data
-                    print "jobs in ", host, " still run ", count
-                    count += 1
+                    if check == 0:
+                        check += 1
+                    elif check == 1:
+                        check -= 1
+                    print "jobs in ", host, " still run ", check
                     flag = 1
                     break
                 else: # complete

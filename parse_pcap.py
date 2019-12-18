@@ -26,7 +26,8 @@ def parse_payload(payload):
 with open(output, 'w') as csvfile:
     w = csv.writer(csvfile)
     w.writerow(['CoflowId', 'ArrivalTime', 'FlowNum', 'src', 'dst'])
-    for filename in file:
+    for filename in sorted(file):
+        print "start to parse ", filename
         packet = rdpcap(dir + filename)
         for i in range(len(packet[TCP])):
             if packet[TCP][i].ack != 0:
