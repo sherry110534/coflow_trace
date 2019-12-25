@@ -5,6 +5,10 @@ from mininet.log import setLogLevel, info
 from mininet.link import Link, Intf, TCLink
 from mininet.topo import Topo
 from mininet.util import dumpNodeConnections
+from scapy.config import conf
+conf.ipv6_enabled = False
+from scapy.all import *
+from Protocol import Protocol
 import logging
 import os
 import time
@@ -152,14 +156,23 @@ if __name__ == '__main__':
         logging.debug("LV1 Create Fattree")
         topo = Fattree(POD_NUM, DENSITY)
         topo.createTopo()
-        topo.createLink(bw_c2a=500, bw_a2e=250, bw_h2a=125) # Mbps
+        topo.createLink(bw_c2a=1000, bw_a2e=500, bw_h2a=250) # Mbps
 
         logging.debug("LV1 Start Mininet")
         CONTROLLER_IP = "127.0.0.1"
         CONTROLLER_PORT = 6653
         net = Mininet(topo=topo, link=TCLink, controller=None, autoSetMacs=True, autoStaticArp=False)
         net.addController("controller", controller=RemoteController,ip=CONTROLLER_IP, port=CONTROLLER_PORT)
+        # net.addNAT().configDefault() # add NAT to connect to real network
         net.start()
+
+        # connect to real network
+        # os.popen('ovs-vsctl add-port s1001 eno1')
+        # for i in range(HOST_NUM):
+        #     tmp = tmp = net.get(Fattree.HostList[i])
+        #     tmp_cmd = "dhclient " + tmp.defaultIntf().name
+        #     print "(" + Fattree.HostList[i] + ")" + tmp_cmd
+        #     tmp.cmd(tmp_cmd)
 
         # Set OVS's protocol as OF13
         topo.set_ovs_protocol_13() 
@@ -176,18 +189,23 @@ if __name__ == '__main__':
         for i in range(HOST_NUM/2, HOST_NUM):
             print "start to record trace in ", Fattree.HostList[i]
             tmp = net.get(Fattree.HostList[i])
-            tmp_cmd = "tcpdump -w ./result/origin/" + Fattree.HostList[i] + ".pcap &"
+            tmp_cmd = "tcpdump tcp -w ./result/origin/" + Fattree.HostList[i] + ".pcap &"
             tmp.cmd(tmp_cmd)
 
-        # create host task
+
+
+        # create host task and src_list
+        src_list = []
         coflow_data = readData()
-        sleep_time = coflow_data[-1]["Arrival time"]
         output_data = []
         for i in range(HOST_NUM/2):
             output_data.append([])
         for i in range(len(coflow_data)):
+        # for i in range(3):
+            this_src_list = []
             flow_num = coflow_data[i]["Mapper num"] * coflow_data[i]["Reducer num"]
             for j in range(coflow_data[i]["Mapper num"]):
+                this_src_list.append(getHostName(getSrcHostId(coflow_data[i]["Mapper list"][j])))
                 hostid = getSrcHostId(coflow_data[i]["Mapper list"][j])
                 this_coflow_data = {}
                 this_coflow_data["Coflow ID"] = coflow_data[i]["Coflow ID"]
@@ -196,32 +214,39 @@ if __name__ == '__main__':
                 this_coflow_data["Dst list"] = []
                 this_coflow_data["Dst data"] = []
                 for k in range(coflow_data[i]["Reducer num"]):
-                    flow_size = coflow_data[i]["Reducer data"][k]*1024 / coflow_data[i]["Mapper num"] # data size per flow (transfer MB to KB)
+                    flow_size = int(coflow_data[i]["Reducer data"][k]*1024 / coflow_data[i]["Mapper num"]) # data size per flow (transfer MB to KB)
                     dst = net.get(getHostName(getDstHostId(coflow_data[i]["Reducer list"][k])))
                     dst_ip = dst.IP()
                     this_coflow_data["Dst list"].append(dst_ip)
                     this_coflow_data["Dst data"].append(flow_size)
                 output_data[hostid-1].append(this_coflow_data)
+                src_list.append(set(this_src_list))
         for i in range(len(output_data)):
             hostname = getHostName(getSrcHostId(i+1)) 
             with open(OUTPUT_DIR + hostname + "_task.json", "w") as f:
                 json.dump(output_data[i], f)
         print "complete output task"
 
-        time.sleep(1) # wait for executing tcpdump
-        # create coflow 
-        print "start to send flow"
-        for i in range(HOST_NUM/2):
-            src_host = getHostName(getSrcHostId(i))
-            src = net.get(src_host)
-            src_ip = src.IP()
-            # python TCP_sender.py hostname hostip &
-            tmp_cmd = "python TCP_sender.py " + str(src_host) + " " + str(src_ip) + " &"
-            result = src.cmd(tmp_cmd)
-            print tmp_cmd
+        time.sleep(5) # wait for executing tcpdump
 
-        time.sleep(sleep_time/1000)
-        print "the last coflow starts"
+        coflow_count = 0
+        time_count = 0 # 0.1s
+        while coflow_count < len(coflow_data):
+        # while coflow_count < 3:
+            if time_count % 100 == 0:
+                print "time: ", time_count/10, "s"
+            while time_count == int(coflow_data[coflow_count]["Arrival time"]/100):
+                # coflow start
+                for src_host in src_list[coflow_count]:
+                    src = net.get(src_host)
+                    src_ip = src.IP()
+                    # python TCP_sender.py hostname hostip coflowId &
+                    tmp_cmd = "python TCP_sender.py " + str(src_host) + " " + str(src_ip) + " " + str(coflow_data[coflow_count]["Coflow ID"]) + " &"
+                    result = src.cmd(tmp_cmd)
+                    print tmp_cmd
+                coflow_count += 1
+            time.sleep(0.1)
+            time_count += 1
 
         # check jobs still run
         flag = 1
