@@ -11,6 +11,8 @@ class Protocol(Packet):
         IntField('CoflowId', 0),
         IntField('ArrivalTime', 0),
         IntField('FlowNum', 0),
+        IntField('MapperId', 0),
+        IntField('ReducerId', 0)
     ]
 
 # bind_layers(TCP, Protocol, frag = 0, proto = 99)

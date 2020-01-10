@@ -166,14 +166,6 @@ if __name__ == '__main__':
         # net.addNAT().configDefault() # add NAT to connect to real network
         net.start()
 
-        # connect to real network
-        # os.popen('ovs-vsctl add-port s1001 eno1')
-        # for i in range(HOST_NUM):
-        #     tmp = tmp = net.get(Fattree.HostList[i])
-        #     tmp_cmd = "dhclient " + tmp.defaultIntf().name
-        #     print "(" + Fattree.HostList[i] + ")" + tmp_cmd
-        #     tmp.cmd(tmp_cmd)
-
         # Set OVS's protocol as OF13
         topo.set_ovs_protocol_13() 
         logger.debug("LV1 dumpNode")
@@ -189,10 +181,9 @@ if __name__ == '__main__':
         for i in range(HOST_NUM/2, HOST_NUM):
             print "start to record trace in ", Fattree.HostList[i]
             tmp = net.get(Fattree.HostList[i])
-            tmp_cmd = "tcpdump tcp -w ./result/origin/" + Fattree.HostList[i] + ".pcap &"
+            tmp_cmd = "tcpdump tcp and tcp[tcpflags] = tcp-syn and dst host " + tmp.IP() + " -s 100 -w ./result/origin/" + Fattree.HostList[i] + ".pcap &"
+            print tmp_cmd
             tmp.cmd(tmp_cmd)
-
-
 
         # create host task and src_list
         src_list = []
@@ -202,15 +193,15 @@ if __name__ == '__main__':
             output_data.append([])
         for i in range(len(coflow_data)):
         # for i in range(3):
-            this_src_list = []
             flow_num = coflow_data[i]["Mapper num"] * coflow_data[i]["Reducer num"]
             for j in range(coflow_data[i]["Mapper num"]):
-                this_src_list.append(getHostName(getSrcHostId(coflow_data[i]["Mapper list"][j])))
                 hostid = getSrcHostId(coflow_data[i]["Mapper list"][j])
                 this_coflow_data = {}
                 this_coflow_data["Coflow ID"] = coflow_data[i]["Coflow ID"]
                 this_coflow_data["Arrival time"] = coflow_data[i]["Arrival time"]
                 this_coflow_data["Flow Number"] = flow_num
+                this_coflow_data["Mapper ID"] = coflow_data[i]["Mapper list"][j]
+                this_coflow_data["Reducer ID"] = []
                 this_coflow_data["Dst list"] = []
                 this_coflow_data["Dst data"] = []
                 for k in range(coflow_data[i]["Reducer num"]):
@@ -219,8 +210,8 @@ if __name__ == '__main__':
                     dst_ip = dst.IP()
                     this_coflow_data["Dst list"].append(dst_ip)
                     this_coflow_data["Dst data"].append(flow_size)
+                    this_coflow_data["Reducer ID"].append(coflow_data[i]["Reducer list"][k])
                 output_data[hostid-1].append(this_coflow_data)
-                src_list.append(set(this_src_list))
         for i in range(len(output_data)):
             hostname = getHostName(getSrcHostId(i+1)) 
             with open(OUTPUT_DIR + hostname + "_task.json", "w") as f:
@@ -229,24 +220,13 @@ if __name__ == '__main__':
 
         time.sleep(5) # wait for executing tcpdump
 
-        coflow_count = 0
-        time_count = 0 # 0.1s
-        while coflow_count < len(coflow_data):
-        # while coflow_count < 3:
-            if time_count % 100 == 0:
-                print "time: ", time_count/10, "s"
-            while time_count == int(coflow_data[coflow_count]["Arrival time"]/100):
-                # coflow start
-                for src_host in src_list[coflow_count]:
-                    src = net.get(src_host)
-                    src_ip = src.IP()
-                    # python TCP_sender.py hostname hostip coflowId &
-                    tmp_cmd = "python TCP_sender.py " + str(src_host) + " " + str(src_ip) + " " + str(coflow_data[coflow_count]["Coflow ID"]) + " &"
-                    result = src.cmd(tmp_cmd)
-                    print tmp_cmd
-                coflow_count += 1
-            time.sleep(0.1)
-            time_count += 1
+        for src_host in Fattree.HostList[0: HOST_NUM/2]:
+            src = net.get(src_host)
+            src_ip = src.IP()
+            # python TCP_sender.py hostname hostip coflowId &
+            tmp_cmd = "python TCP_sender.py " + str(src_host) + " " + str(src_ip) + " &"
+            result = src.cmd(tmp_cmd)
+            print tmp_cmd 
 
         # check jobs still run
         flag = 1
