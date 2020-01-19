@@ -12,6 +12,7 @@ host_name = sys.argv[1]
 host_ip = sys.argv[2]
 
 FILE_NAME = "./task/" + host_name + "_task.json"
+RECORD_FILE = "./result/record/" + host_name + "_time.txt"
 
 def readData():
     with open(FILE_NAME, "r") as f:
@@ -24,6 +25,7 @@ def sendData(coflow_id, arrival_time, flow_number, flow_list):
     time_count_ = 0 # time count for waking up flow 
     flow_index = 0 # index of flow which added into start_flow list
     start_flow = []
+    start_time = time.time()
     while True:
         if flow_index < len(flow_list): # this flow starts
             while time_count_ >= flow_list[flow_index]['sleep']:
@@ -62,7 +64,7 @@ def sendData(coflow_id, arrival_time, flow_number, flow_list):
                     del start_f['datas'][tmp_index]
                     del start_f['dst'][tmp_index]
                     del start_f['reducers'][tmp_index]
-                    if len(start_f['datas']) > 0:
+                    if start_f['datas'] != []:
                         min_packet_num[star_f_index] = min(start_f['datas'])
                     else:
                         break
@@ -76,12 +78,16 @@ def sendData(coflow_id, arrival_time, flow_number, flow_list):
 
         if complete and flow_index >= len(flow_list):
             print coflow_id, " complete!"
+            end_time = time.time()
+            record = str(coflow_id) + "\t" + str(start_time) + "\t" + str(end_time) + "\t" + str(end_time-start_time) + "\n"
+            fw.write(record)
             break
 
 if __name__ == '__main__':
     print "(sender) " + host_name + " reading tasking file: " + FILE_NAME
     task_data = readData()
-
+    fw = open(RECORD_FILE, "w+")
+    fw.write("CoflowID\tStart time\tEndtime\tInterval\n")
     thread_list = []
     flow_count = 0
     time_count = 0 # 0.1s
@@ -133,6 +139,8 @@ if __name__ == '__main__':
     for t in thread_list:
         t.join()
     print "Exiting"
+    fw.close()
+            
         
 
 # ip = IP(src = ['10.0.0.1'], dst = ['10.0.0.2', '10.0.0.2', '10.0.0.3','10.0.0.2'])

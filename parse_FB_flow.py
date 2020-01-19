@@ -34,7 +34,9 @@ if __name__ == '__main__':
     output_list = []
     data = read_data()
     for d in data:
-      output_list.append(parse(d))  
+        if int(d[0]) == 4:
+            continue
+        output_list.append(parse(d))  
     with open("./coflow_data.json", "w") as f:
         json.dump(output_list, f)
     print "complete"

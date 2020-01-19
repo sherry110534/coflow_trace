@@ -191,8 +191,8 @@ if __name__ == '__main__':
         output_data = []
         for i in range(HOST_NUM/2):
             output_data.append([])
-        for i in range(len(coflow_data)):
-        # for i in range(3):
+        # for i in range(len(coflow_data)):
+        for i in range(11):
             flow_num = coflow_data[i]["Mapper num"] * coflow_data[i]["Reducer num"]
             for j in range(coflow_data[i]["Mapper num"]):
                 hostid = getSrcHostId(coflow_data[i]["Mapper list"][j])
@@ -218,41 +218,41 @@ if __name__ == '__main__':
                 json.dump(output_data[i], f)
         print "complete output task"
 
-        time.sleep(5) # wait for executing tcpdump
+        # time.sleep(5) # wait for executing tcpdump
 
-        for src_host in Fattree.HostList[0: HOST_NUM/2]:
-            src = net.get(src_host)
-            src_ip = src.IP()
-            # python TCP_sender.py hostname hostip coflowId &
-            tmp_cmd = "python TCP_sender.py " + str(src_host) + " " + str(src_ip) + " &"
-            result = src.cmd(tmp_cmd)
-            print tmp_cmd 
+        # for src_host in Fattree.HostList[0: HOST_NUM/2]:
+        #     src = net.get(src_host)
+        #     src_ip = src.IP()
+        #     # python TCP_sender.py hostname hostip coflowId &
+        #     tmp_cmd = "python TCP_sender.py " + str(src_host) + " " + str(src_ip) + " &"
+        #     result = src.cmd(tmp_cmd)
+        #     print tmp_cmd 
 
-        # check jobs still run
-        flag = 1
-        check = 0
-        while flag :
-            time.sleep(20) # after 20 seconds, check again
-            for host in Fattree.HostList[0: HOST_NUM/2]:
-                tmp = net.get(host)
-                now_jobs = tmp.cmd("jobs")
-                if len(now_jobs) != 0 : # still send data
-                    if check == 0:
-                        check += 1
-                    elif check == 1:
-                        check -= 1
-                    print "jobs in ", host, " still run ", check
-                    flag = 1
-                    break
-                else: # complete
-                    flag = 0
-                    continue
+        # # check jobs still run
+        # flag = 1
+        # check = 0
+        # while flag :
+        #     time.sleep(20) # after 20 seconds, check again
+        #     for host in Fattree.HostList[0: HOST_NUM/2]:
+        #         tmp = net.get(host)
+        #         now_jobs = tmp.cmd("jobs")
+        #         if len(now_jobs) != 0 : # still send data
+        #             if check == 0:
+        #                 check += 1
+        #             elif check == 1:
+        #                 check -= 1
+        #             print "jobs in ", host, " still run ", check
+        #             flag = 1
+        #             break
+        #         else: # complete
+        #             flag = 0
+        #             continue
 
-        # close tcpdump
-        for i in range(HOST_NUM/2, HOST_NUM):
-            print "close to trace flow in ", Fattree.HostList[i]
-            tmp = net.get(Fattree.HostList[i])
-            tmp_cmd = "ps aux | grep tcpdump | awk '{print $2}' | xargs sudo kill -9"
+        # # close tcpdump
+        # for i in range(HOST_NUM/2, HOST_NUM):
+        #     print "close to trace flow in ", Fattree.HostList[i]
+        #     tmp = net.get(Fattree.HostList[i])
+        #     tmp_cmd = "ps aux | grep tcpdump | awk '{print $2}' | xargs sudo kill -9"
 
         CLI(net)
         net.stop()
