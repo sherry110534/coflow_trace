@@ -189,10 +189,12 @@ if __name__ == '__main__':
         src_list = []
         coflow_data = readData()
         output_data = []
+        output_data_ = []
         for i in range(HOST_NUM/2):
             output_data.append([])
+            output_data_.append([])
         # for i in range(len(coflow_data)):
-        for i in range(11):
+        for i in range(10):
             flow_num = coflow_data[i]["Mapper num"] * coflow_data[i]["Reducer num"]
             for j in range(coflow_data[i]["Mapper num"]):
                 hostid = getSrcHostId(coflow_data[i]["Mapper list"][j])
@@ -212,10 +214,33 @@ if __name__ == '__main__':
                     this_coflow_data["Dst data"].append(flow_size)
                     this_coflow_data["Reducer ID"].append(coflow_data[i]["Reducer list"][k])
                 output_data[hostid-1].append(this_coflow_data)
+
+        for i in range(len(output_data)):
+            flow_count = 0
+            while flow_count < len(output_data[i]):
+                this_coflow_data = {}
+                this_coflow_data["Coflow ID"] = output_data[i][flow_count]["Coflow ID"]
+                this_coflow_data["Arrival time"] = output_data[i][flow_count]["Arrival time"]
+                this_coflow_data["Flow Number"] = output_data[i][flow_count]["Flow Number"]
+                this_coflow_data["Reducer ID"] = output_data[i][flow_count]["Reducer ID"]
+                this_coflow_data["Dst list"] = output_data[i][flow_count]["Dst list"]
+                this_coflow_data["Dst data"] = output_data[i][flow_count]["Dst data"]
+                this_coflow_data["Mapper ID"] = []
+                this_coflow_data["Mapper ID"].append(output_data[i][flow_count]["Mapper ID"])
+                # find flows in same coflow 
+                while flow_count+1 < len(output_data[i]):
+                    if output_data[i][flow_count]["Coflow ID"] == output_data[i][flow_count+1]["Coflow ID"]:
+                        flow_count += 1
+                        this_coflow_data["Mapper ID"].append(output_data[i][flow_count]["Mapper ID"]) # append source ID(1-D array)
+                    else:
+                        break
+                flow_count += 1
+                output_data_[i].append(this_coflow_data)
+
         for i in range(len(output_data)):
             hostname = getHostName(getSrcHostId(i+1)) 
             with open(OUTPUT_DIR + hostname + "_task.json", "w") as f:
-                json.dump(output_data[i], f)
+                json.dump(output_data_[i], f)
         print "complete output task"
 
         # time.sleep(5) # wait for executing tcpdump
