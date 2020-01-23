@@ -13,6 +13,7 @@ host_ip = sys.argv[2]
 
 FILE_NAME = "./task/" + host_name + "_task.json"
 RECORD_FILE = "./result/record/" + host_name + "_time.txt"
+FLOW_FILE = "./result/record/" + host_name + "_flow_time.txt"
 
 def readData():
     with open(FILE_NAME, "r") as f:
@@ -24,6 +25,7 @@ def sendData(coflow_data, sleep_time):
 
     now_packet_count = [0] * len(coflow_data["Mapper ID"]) # record the number of packet which sended by this mapper
     min_packet_num = [min(coflow_data["Dst data"])] * len(coflow_data["Mapper ID"]) # record the min number of packet in this mapper send list
+    all_flow_time = [] # record flow start and end time
     time_count_ = 0 # time count for waking up flow 
     flow_index = 0 # index of flow which added into start_mapper list
     start_mapper = []
@@ -37,6 +39,7 @@ def sendData(coflow_data, sleep_time):
                 this_mapper["Reducer ID"] = list(coflow_data["Reducer ID"])
                 this_mapper["Dst list"] = list(coflow_data["Dst list"])
                 start_mapper.append(this_mapper)
+                all_flow_time.append([time.time(), 0.0])
                 flow_index += 1
             else:
                 break
@@ -66,6 +69,10 @@ def sendData(coflow_data, sleep_time):
                         min_packet_num[i] = min(start_mapper[i]["Dst data"])
                     else:
                         min_packet_num[i] = -1 # complete
+                        if all_flow_time[i][1] == 0.0:
+                            all_flow_time[i][1] = time.time()
+                            record = str(coflow_data["Coflow ID"]) + "\tFLOWID" + str(i) + "\t" + str(all_flow_time[i][0]) + "\t" + str(all_flow_time[i][1]) + "\t" + str(all_flow_time[i][1]-all_flow_time[i][0]) + "\n"
+                            ff.write(record)
                         break
         if all_skip:
             time_count_ += 1
@@ -87,7 +94,9 @@ if __name__ == '__main__':
     print "(sender) " + host_name + " reading tasking file: " + FILE_NAME
     task_data = readData()
     fw = open(RECORD_FILE, "w+")
+    ff = open(FLOW_FILE, "w+")
     fw.write("CoflowID\tStart time\tEndtime\tInterval\n")
+    ff.write("CoflowID\tFLOWID\tStart time\tEndtime\tInterval\n")
     # create coflow
     thread_list = []
     for flow_count in range(len(task_data)):
@@ -107,3 +116,4 @@ if __name__ == '__main__':
         t.join()
     print "Exiting"
     fw.close()
+    ff.close()
