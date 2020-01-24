@@ -39,7 +39,7 @@ def sendData(coflow_data, sleep_time):
                 this_mapper["Reducer ID"] = list(coflow_data["Reducer ID"])
                 this_mapper["Dst list"] = list(coflow_data["Dst list"])
                 start_mapper.append(this_mapper)
-                all_flow_time.append([time.time(), 0.0])
+                all_flow_time.append(time.time())
                 flow_index += 1
             else:
                 break
@@ -62,6 +62,9 @@ def sendData(coflow_data, sleep_time):
                 # delete the complete flow dst
                 while now_packet_count[i] >= min_packet_num[i] and  min_packet_num[i] != -1:
                     tmp_index = start_mapper[i]["Dst data"].index(min_packet_num[i])
+                    now_time = time.time()
+                    record = "COFLOWID" + str(coflow_data["Coflow ID"]) + "\t" + str(start_mapper[i]["Mapper ID"]) + "\t" + str(start_mapper[i]["Reducer ID"][tmp_index]) + "\t" + str(start_mapper[i]["Dst data"][tmp_index]*65469/1024) + "\t" + str(all_flow_time[i]) + "\t" + str(now_time) + "\t" + str(now_time-all_flow_time[i]) + "\n"
+                    ff.write(record)
                     del start_mapper[i]["Dst data"][tmp_index]
                     del start_mapper[i]["Dst list"][tmp_index]
                     del start_mapper[i]["Reducer ID"][tmp_index]
@@ -69,10 +72,6 @@ def sendData(coflow_data, sleep_time):
                         min_packet_num[i] = min(start_mapper[i]["Dst data"])
                     else:
                         min_packet_num[i] = -1 # complete
-                        if all_flow_time[i][1] == 0.0:
-                            all_flow_time[i][1] = time.time()
-                            record = str(coflow_data["Coflow ID"]) + "\tFLOWID" + str(i) + "\t" + str(all_flow_time[i][0]) + "\t" + str(all_flow_time[i][1]) + "\t" + str(all_flow_time[i][1]-all_flow_time[i][0]) + "\n"
-                            ff.write(record)
                         break
         if all_skip:
             time_count_ += 1
@@ -86,7 +85,7 @@ def sendData(coflow_data, sleep_time):
         if complete:
             print str(coflow_data["Coflow ID"]), " complete!"
             end_time = time.time()
-            record = str(coflow_data["Coflow ID"]) + "\t" + str(start_time) + "\t" + str(end_time) + "\t" + str(end_time-start_time) + "\n"
+            record = "COFLOWID" + str(coflow_data["Coflow ID"]) + "\t" + str(coflow_data["Flow Number"]) + "\t" + str(start_time) + "\t" + str(end_time) + "\t" + str(end_time-start_time) + "\n"
             fw.write(record)
             break
 
@@ -95,8 +94,8 @@ if __name__ == '__main__':
     task_data = readData()
     fw = open(RECORD_FILE, "w+")
     ff = open(FLOW_FILE, "w+")
-    fw.write("CoflowID\tStart time\tEndtime\tInterval\n")
-    ff.write("CoflowID\tFLOWID\tStart time\tEndtime\tInterval\n")
+    fw.write("CoflowID\tFlowNum\tStarttime\tEndtime\tInterval\n")
+    ff.write("CoflowID\tMapper\tReducer\tDataSize(KB)\tStarttime\tEndtime\tInterval\n")
     # create coflow
     thread_list = []
     for flow_count in range(len(task_data)):
