@@ -4,7 +4,7 @@ from scapy.all import *
 import os
 import csv
 
-dir = './result/fix/'
+dir = './result/pcap_record/'
 output = './result/result.csv'
 file = os.listdir(dir)
 
@@ -25,16 +25,23 @@ def parse_payload(payload):
 
 with open(output, 'w') as csvfile:
     w = csv.writer(csvfile)
-    w.writerow(['CoflowId', 'ArrivalTime', 'FlowNum', 'src', 'dst'])
+    w.writerow(['CoflowId', 'ArrivalTime', 'FlowNum', 'MapperId', 'ReducerId', 'PacketArrival', 'PacketSize', 'src', 'dst'])
     for filename in sorted(file):
         print "start to parse ", filename
         packet = rdpcap(dir + filename)
         for i in range(len(packet[TCP])):
             if packet[TCP][i].ack != 0:
                 continue
-            hex_string = parse_payload(packet[TCP][i].load)
-            CoflowId_hex = hex_string[0:8]
-            ArrivalTime_hex = hex_string[8:16]
-            FlowNum_hex = hex_string[16:24]
-            # write into csv
-            w.writerow([string_to_hex(CoflowId_hex), string_to_hex(ArrivalTime_hex), string_to_hex(FlowNum_hex), packet[TCP][0].src, packet[TCP][0].dst])
+            try:
+                hex_string = parse_payload(packet[TCP][i].load)
+                CoflowId_hex = hex_string[0:8]
+                ArrivalTime_hex = hex_string[8:16]
+                FlowNum_hex = hex_string[16:24]
+                MapperId_hex = hex_string[24:32]
+                ReducerId_hex = hex_string[32:40]
+                PacketArrival_hex = hex_string[40:48]
+                PacketSize_hex = hex_string[48:56]
+                # write into csv
+                w.writerow([string_to_hex(CoflowId_hex), string_to_hex(ArrivalTime_hex), string_to_hex(FlowNum_hex), string_to_hex(MapperId_hex), string_to_hex(ReducerId_hex), string_to_hex(PacketArrival_hex), string_to_hex(PacketSize_hex), packet[TCP][0].src, packet[TCP][0].dst])
+            except:
+                print("error")

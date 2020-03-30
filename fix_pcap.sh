@@ -1,5 +1,5 @@
 #!/bin/bash
-for i in $(ls ./result/origin)
+for i in $(ls ./result/pcap_record)
 do 
-    pcapfix -d ./result/origin/$i -o ./result/fix/$i
+    pcapfix -d ./result/pcap_record/$i
 done

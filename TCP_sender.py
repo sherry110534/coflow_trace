@@ -7,6 +7,7 @@ import time
 import json
 import threading
 import random
+import numpy as np
 
 host_name = sys.argv[1]
 host_ip = sys.argv[2]
@@ -20,7 +21,7 @@ def readData():
         load_data = json.load(f)
         return load_data
 
-def sendData(coflow_data, sleep_time):
+def sendData(coflow_data, sleep_time, packets_size_list):
     print "coflow ", coflow_data["Coflow ID"], " start"
     this_thread = threading.currentThread()
 
@@ -55,9 +56,10 @@ def sendData(coflow_data, sleep_time):
                 for j in range(len(start_mapper[i]["Dst list"])):
                     # send packet
                     ip = IP(src = host_ip, dst = start_mapper[i]["Dst list"][j])
-                    coflow = Protocol(CoflowId = coflow_data["Coflow ID"], ArrivalTime = coflow_data["Arrival time"], FlowNum = coflow_data["Flow Number"], MapperId = start_mapper[i]["Mapper ID"], ReducerId = start_mapper[i]["Reducer ID"][j])
+                    this_packet_size = int(random.choice(packets_size_list))+28
+                    coflow = Protocol(CoflowId = coflow_data["Coflow ID"], ArrivalTime = coflow_data["Arrival time"], FlowNum = coflow_data["Flow Number"], MapperId = start_mapper[i]["Mapper ID"], ReducerId = start_mapper[i]["Reducer ID"][j], PacketArrival = int(time.time()), PacketSize = this_packet_size)
                     tcp = TCP()
-                    packet = ip / tcp / coflow / Raw(RandString(size=2048)) # the max payload size
+                    packet = ip / tcp / coflow / Raw(RandString(size=this_packet_size))
                     send(packet) 
                     time_count_ += 1
                 now_packet_count[i] += 1
@@ -65,7 +67,7 @@ def sendData(coflow_data, sleep_time):
                 while now_packet_count[i] >= min_packet_num[i] and  min_packet_num[i] != -1:
                     tmp_index = start_mapper[i]["Dst data"].index(min_packet_num[i])
                     now_time = time.time()
-                    # record = "COFLOWID" + str(coflow_data["Coflow ID"]) + "\t" + str(start_mapper[i]["Mapper ID"]) + "\t" + str(start_mapper[i]["Reducer ID"][tmp_index]) + "\t" + str(start_mapper[i]["Dst data"][tmp_index]*2048/1024) + "\t" + str(all_flow_time[i]) + "\t" + str(now_time) + "\t" + str(now_time-all_flow_time[i]) + "\n"
+                    # record = "COFLOWID" + str(coflow_data["Coflow ID"]) + "\t" + str(start_mapper[i]["Mapper ID"]) + "\t" + str(start_mapper[i]["Reducer ID"][tmp_index]) + "\t" + str(start_mapper[i]["Dst data"][tmp_index]*1024/1024) + "\t" + str(all_flow_time[i]) + "\t" + str(now_time) + "\t" + str(now_time-all_flow_time[i]) + "\n"
                     # ff.write(record)
                     del start_mapper[i]["Dst data"][tmp_index]
                     del start_mapper[i]["Dst list"][tmp_index]
@@ -105,22 +107,26 @@ if __name__ == '__main__':
     fw = open(RECORD_FILE, "w+")
     # ff = open(FLOW_FILE, "w+")
     fw.write("CoflowID\tFlowNum\tStarttime\tEndtime\tInterval\n")
-    ff.write("CoflowID\tMapper\tReducer\tDataSize(KB)\tStarttime\tEndtime\tInterval\n")
+    # ff.write("CoflowID\tMapper\tReducer\tDataSize(KB)\tStarttime\tEndtime\tInterval\n")
     # create coflow
     thread_list = []
     time_to_stop = []
     for flow_count in range(len(task_data)):
         coflow_data = {}
         coflow_data = task_data[flow_count].copy()
-        coflow_data["Dst data"] = [int(i)*1024/2048 for i in task_data[flow_count]["Dst data"]]  # cout packet number in a flow
+        packet_size_list = np.random.normal(loc=int(task_data[flow_count]["Packet mean"]), scale=int(task_data[flow_count]["Packet scale"]), size=10000) 
+        for i in range(len(packet_size_list)):
+            while packet_size_list[i] < 0:
+                packet_size_list[i] ==  np.random.normal(loc=int(task_data[flow_count]["Packet mean"]), scale=int(task_data[flow_count]["Packet scale"]), size=1)[0]
+        coflow_data["Dst data"] = [int(i)*1024/int(task_data[flow_count]["Packet mean"]) for i in task_data[flow_count]["Dst data"]]  # cout packet number in a flow
         # create the delay time for all flows in the same coflow
         sleep_time_list = [random.randint(0, min(100,max(coflow_data["Dst data"]))) for i in range(len(coflow_data["Mapper ID"]))] # the time slot is a packet time
         sleep_time_list[random.randint(0, len(coflow_data["Mapper ID"])-1)] = 0 # one flow needs to start at 0s
         sleep_time = sorted(sleep_time_list)
-        t = threading.Timer(float(task_data[flow_count]["Arrival time"]/1000),sendData, args=(coflow_data, sleep_time))
+        t = threading.Timer(float(task_data[flow_count]["Arrival time"]/1000),sendData, args=(coflow_data, sleep_time, packet_size_list))
         t._name = "coflow" + str(task_data[flow_count]["Coflow ID"])
         thread_list.append(t)
-        time_to_stop.append(float(task_data[flow_count]["Arrival time"]/1000)+1200) # send 1800s
+        time_to_stop.append(float(task_data[flow_count]["Arrival time"]/1000)+600) # send 180s
     for t in thread_list:
         t.start()
     timer = 0
@@ -143,4 +149,4 @@ if __name__ == '__main__':
         t.join()
     print "Exiting"
     fw.close()
-    ff.close()
+    # ff.close()

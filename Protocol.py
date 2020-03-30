@@ -12,7 +12,9 @@ class Protocol(Packet):
         IntField('ArrivalTime', 0),
         IntField('FlowNum', 0),
         IntField('MapperId', 0),
-        IntField('ReducerId', 0)
+        IntField('ReducerId', 0),
+        IntField('PacketArrival',0),
+        IntField('PacketSize',0)
     ]
 
 # bind_layers(TCP, Protocol, frag = 0, proto = 99)

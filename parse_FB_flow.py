@@ -1,4 +1,5 @@
 import json
+import random
 
 # MAPPER NUM 150 (id:0~149)
 # REDUCER NUM 150 (id:0~149)
@@ -28,6 +29,8 @@ def parse(data_line):
         tmp_s = tmp_dict['Reducer list'][i].split(":")
         tmp_dict['Reducer list'][i] = int(tmp_s[0])
         tmp_dict['Reducer data'].append(float(tmp_s[1]))
+    tmp_dict["Packet mean"] = random.randint(1024, 8192)
+    tmp_dict["Packet scale"] = random.randint(128, 512)
     return tmp_dict
 
 if __name__ == '__main__':

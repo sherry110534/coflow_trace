@@ -181,7 +181,7 @@ if __name__ == '__main__':
         for i in range(HOST_NUM/2, HOST_NUM):
             print "start to record trace in ", Fattree.HostList[i]
             tmp = net.get(Fattree.HostList[i])
-            tmp_cmd = "tcpdump tcp and tcp[tcpflags] = tcp-syn and dst host " + tmp.IP() + " -s 100 -w ./result/origin/" + Fattree.HostList[i] + ".pcap &"
+            tmp_cmd = "tcpdump tcp and tcp[tcpflags] = tcp-syn and dst host " + tmp.IP() + " -s 100 -w ./result/pcap_record/" + Fattree.HostList[i] + ".pcap &"
             print tmp_cmd
             tmp.cmd(tmp_cmd)
 
@@ -206,6 +206,8 @@ if __name__ == '__main__':
                 this_coflow_data["Reducer ID"] = []
                 this_coflow_data["Dst list"] = []
                 this_coflow_data["Dst data"] = []
+                this_coflow_data["Packet mean"] = coflow_data[i]["Packet mean"]
+                this_coflow_data["Packet scale"] = coflow_data[i]["Packet scale"]
                 for k in range(coflow_data[i]["Reducer num"]):
                     flow_size = int(coflow_data[i]["Reducer data"][k]*1024 / coflow_data[i]["Mapper num"]) # data size per flow (transfer MB to KB)
                     dst = net.get(getHostName(getDstHostId(coflow_data[i]["Reducer list"][k])))
@@ -227,6 +229,8 @@ if __name__ == '__main__':
                 this_coflow_data["Dst data"] = output_data[i][flow_count]["Dst data"]
                 this_coflow_data["Mapper ID"] = []
                 this_coflow_data["Mapper ID"].append(output_data[i][flow_count]["Mapper ID"])
+                this_coflow_data["Packet mean"] = output_data[i][flow_count]["Packet mean"]
+                this_coflow_data["Packet scale"] = coflow_data[i]["Packet scale"]
                 # find flows in same coflow 
                 while flow_count+1 < len(output_data[i]):
                     if output_data[i][flow_count]["Coflow ID"] == output_data[i][flow_count+1]["Coflow ID"]:
