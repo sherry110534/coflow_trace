@@ -15,6 +15,9 @@ host_ip = sys.argv[2]
 FILE_NAME = "./task/" + host_name + "_task.json"
 RECORD_FILE = "./result/record/" + host_name + "_time.txt"
 FLOW_FILE = "./result/record/" + host_name + "_flow_time.txt"
+if not os.path.isdir("./result/record/"):
+    os.mkdir("./result/record/")
+SEND_TIME = 180 # seconds
 
 def readData():
     with open(FILE_NAME, "r") as f:
@@ -56,7 +59,7 @@ def sendData(coflow_data, sleep_time, packets_size_list):
                 for j in range(len(start_mapper[i]["Dst list"])):
                     # send packet
                     ip = IP(src = host_ip, dst = start_mapper[i]["Dst list"][j])
-                    this_packet_size = int(random.choice(packets_size_list))+28
+                    this_packet_size = int(random.choice(packets_size_list)) + 28 # + header
                     coflow = Protocol(CoflowId = coflow_data["Coflow ID"], ArrivalTime = coflow_data["Arrival time"], FlowNum = coflow_data["Flow Number"], MapperId = start_mapper[i]["Mapper ID"], ReducerId = start_mapper[i]["Reducer ID"][j], PacketArrival = int(time.time()), PacketSize = this_packet_size)
                     tcp = TCP()
                     packet = ip / tcp / coflow / Raw(RandString(size=this_packet_size))
@@ -126,9 +129,11 @@ if __name__ == '__main__':
         t = threading.Timer(float(task_data[flow_count]["Arrival time"]/1000),sendData, args=(coflow_data, sleep_time, packet_size_list))
         t._name = "coflow" + str(task_data[flow_count]["Coflow ID"])
         thread_list.append(t)
-        time_to_stop.append(float(task_data[flow_count]["Arrival time"]/1000)+600) # send 180s
+        time_to_stop.append(float(task_data[flow_count]["Arrival time"]/1000)+180)
     for t in thread_list:
         t.start()
+        
+    # when to stop thread
     timer = 0
     time_index = 0
     while True:

@@ -4,9 +4,11 @@ import random
 # MAPPER NUM 150 (id:0~149)
 # REDUCER NUM 150 (id:0~149)
 
+INPUTFILE = 'FB2010-1Hr-150-0.txt'
+OUTPUTFILE = 'coflow_data.json'
 def read_data():
     data_line = []
-    with open('FB2010-1Hr-150-0.txt', 'r') as f:
+    with open(INPUTFILE, 'r') as f:
         for line in f:
             data_line.append(line.replace('\n', '').split(' '))
     data_line = data_line[1:]
@@ -37,10 +39,8 @@ if __name__ == '__main__':
     output_list = []
     data = read_data()
     for d in data:
-        # if int(d[0]) == 4:
-        #     continue
         output_list.append(parse(d))  
-    with open("./coflow_data.json", "w") as f:
+    with open(OUTPUTFILE, "w") as f:
         json.dump(output_list, f)
     print "complete"
 
