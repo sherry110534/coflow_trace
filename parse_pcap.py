@@ -39,9 +39,9 @@ with open(output, 'w') as csvfile:
                 FlowNum_hex = hex_string[16:24]
                 MapperId_hex = hex_string[24:32]
                 ReducerId_hex = hex_string[32:40]
-                PacketArrival_hex = hex_string[40:48]
+                PacketArrival = packet[TCP][i].time
                 PacketSize_hex = hex_string[48:56]
                 # write into csv
-                w.writerow([string_to_hex(CoflowId_hex), string_to_hex(ArrivalTime_hex), string_to_hex(FlowNum_hex), string_to_hex(MapperId_hex), string_to_hex(ReducerId_hex), string_to_hex(PacketArrival_hex), string_to_hex(PacketSize_hex), packet[TCP][0].src, packet[TCP][0].dst])
+                w.writerow([string_to_hex(CoflowId_hex), string_to_hex(ArrivalTime_hex), string_to_hex(FlowNum_hex), string_to_hex(MapperId_hex), string_to_hex(ReducerId_hex), str(PacketArrival), string_to_hex(PacketSize_hex), packet[TCP][0].src, packet[TCP][0].dst])
             except:
                 print("error")
